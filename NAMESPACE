@@ -1,0 +1,3 @@
+exportPattern("^[[:alpha:]]+")
+export("volcano_plotting", "T_Anavo_plotting","RunMetaboAnalystR",
+       "CalculateModificationIntensity","MergeModificationIntensity","PickBrainRegion")

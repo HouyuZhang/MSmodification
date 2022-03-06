@@ -1,0 +1,12 @@
+Package: MSmodification
+Type: Package
+Title: Analyze Mass-spectrometry/MS-imaging data
+Version: 0.1
+Author: Houyu Zhang
+Maintainer: Houyu Zhang <houyuzhang@stu.pku.edu.cn>
+Description: This package read raw MS intensity signals and do data transformation and statistics
+License: MIT
+Encoding: UTF-8
+LazyData: true
+Imports: tidyverse, readxl, tools, MetaboAnalystR, pls, janitor, ggrepel
+RoxygenNote: 7.1.2
