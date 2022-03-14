@@ -5,8 +5,8 @@
 \title{This is a standalone script for picking certain regions and features}
 \usage{
 PickBrainRegion(
-  MergeModificationIntensityName = "",
-  PickBrainRegionNames = c(),
+  MergeModificationIntensityName = "Positive-merged.csv",
+  PickBrainRegionNames = c("cerebellum"),
   run_RunMetaboAnalystR = T,
   FeatureList = c()
 )
