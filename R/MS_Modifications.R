@@ -6,14 +6,14 @@
 # Note 2. Please make sure there aren't irrelevant xlsx files exist in current directory;
 # Note 3. You can add desired modification in the "Modification_reference.csv" file.
 
-# Version 1.2 created by Houyu Zhang on 2022/03/14
+# Version 1.3 created by Houyu Zhang on 2022/03/18
 # Issue report on Hughiez047@gmail.com
 # Copyright (c) 2022 __KoziolLab@CIBR__. All rights reserved.
 #=========================================================================================
 
 # Loaded installed packages or installed from CRAN and load.
 # setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-packages <- c("tidyverse", "readxl", "tools","MetaboAnalystR","pls","janitor","ggrepel")
+packages <- c("tidyverse", "readxl", "tools","MetaboAnalystR","pls","janitor","ggrepel","openxlsx")
 
 package.check <- lapply(
   packages,
@@ -24,6 +24,35 @@ package.check <- lapply(
     } else {suppressPackageStartupMessages(library(x, character.only = T))}
   }
 )
+
+
+
+##' Generate excel tables for store MS-imaging data for each region, each section and each slide
+##' @param BrainRegionNames Brain region names selected in the MS-imaging
+##' @param SamplesNames Sample names for each section
+##' @param SectionNames Number for each section
+##' @examples
+##'
+##'GenrateExcelforMSdata(BrainRegionNames = c("cerebellum","pons&medulla","midbrain","hippocampus","thalamus",
+##'                                            "hypothalamus","fornix","caudate putamen","basal forebrain","ventral striatum",
+##'                                            "anterior olfactory","olfactory bulbs","cortex","corpus callosum"),
+##'                      SamplesNames = c("WT4","WT5","WT6","5-FAD4","5-FAD5","5-FAD6"),
+##'                      SectionNames = c("01","02","03","04"))
+
+GenrateExcelforMSdata <- function(BrainRegionNames = c(),
+                                  SamplesNames = c(),
+                                  SectionNames = c()){
+  for (SamplesName in SamplesNames){
+    for (SectionName in SectionNames){
+      wb <- createWorkbook(creator = "AUTO")
+      for (BrainRegionName in BrainRegionNames){
+        addWorksheet(wb = wb, sheetName = paste0(SamplesName,"-",BrainRegionName,"-",SectionName))
+      }
+      saveWorkbook(wb, file = paste0(Sys.Date()," Negative-",SamplesName,"-14 brain regions-",SectionName,".xlsx"), overwrite = TRUE)
+      saveWorkbook(wb, file = paste0(Sys.Date()," Positive-",SamplesName,"-14 brain regions-",SectionName,".xlsx"), overwrite = TRUE)
+    }
+  }
+}
 
 ##' Draw modified Volcano Plot using ggplot
 ##' @param PlotFile The file returned by Volcano.Anal() in MetaboAnalystR
@@ -290,13 +319,14 @@ CalculateModificationIntensity <- function(MSFilePath = "",
       MSraw$Base <- ""
 
       #Process each m/z compound
-      for (i in 1:length(MSraw$`m/z`)){
-        mz <- MSraw[i,][[1]]
-        index <- which(ModificationReference$mz_lower <= mz & ModificationReference$mz_upper >= mz)
-        Nucleotide <- ifelse(isTRUE(index > 0), ModificationReference[index,]$rNs, "")
-        MSraw[i,]$Base <- Nucleotide
+      if (length(MSraw$`m/z`) > 0){
+        for (i in 1:length(MSraw$`m/z`)){
+          mz <- MSraw[i,][[1]]
+          index <- which(ModificationReference$mz_lower <= mz & ModificationReference$mz_upper >= mz)
+          Nucleotide <- ifelse(isTRUE(index > 0), ModificationReference[index,]$rNs, "")
+          MSraw[i,]$Base <- Nucleotide
+        }
       }
-
       #Collapse results
       ResTable <- MSraw %>% group_by(Base) %>%
         summarise(Intensity = sum(Intensity)) %>%
