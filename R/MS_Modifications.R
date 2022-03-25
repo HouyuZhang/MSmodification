@@ -29,14 +29,14 @@ package.check <- lapply(
 ##' @param SectionNames Number for each section
 ##' @examples
 ##'
-##'GenrateExcelforMSdata(BrainRegionNames = c("cerebellum","pons&medulla","midbrain","hippocampus","thalamus",
+##'GenrateExcelforMSdata(SamplesNames = c("WT4","WT5","WT6","5-FAD4","5-FAD5","5-FAD6"),
+##'                      BrainRegionNames = c("cerebellum","pons&medulla","midbrain","hippocampus","thalamus",
 ##'                                            "hypothalamus","fornix","caudate putamen","basal forebrain","ventral striatum",
 ##'                                            "anterior olfactory","olfactory bulbs","cortex","corpus callosum"),
-##'                      SamplesNames = c("WT4","WT5","WT6","5-FAD4","5-FAD5","5-FAD6"),
 ##'                      SectionNames = c("01","02","03","04"))
 
-GenrateExcelforMSdata <- function(BrainRegionNames,
-                                  SamplesNames,
+GenrateExcelforMSdata <- function(SamplesNames,
+                                  BrainRegionNames,
                                   SectionNames){
   for (SamplesName in SamplesNames){
     for (SectionName in SectionNames){
@@ -236,7 +236,7 @@ NormalizationIntensityPercentage <- function(MergeModificationIntensityFile,
 
   labels <- gsub("-[0-9]+","",colnames(mergedMS))
   mergedMS <- rbind(labels, mergedMS)
-  write.csv(file = paste0(Prefix,"-NormalizedSIndividual.csv"), mergedMS, row.names = T)
+  write.csv(file = paste0(Prefix,"-NormalizedPercentage.csv"), mergedMS, row.names = T)
 }
 
 ##' Merge technical replicates based on section suffix

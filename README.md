@@ -6,21 +6,24 @@ Copyright (c) 2022 KoziolLab@CIBR. All rights reserved.
 
 ### Introduction
 
-[Magdalena J Koziol Lab](https://dnalaboratory.org/) is studying and aiming to discover further novel DNA and RNA modifications and investigate their role in the brain using mass spectrometry, MS-imaging (MSI) and nanopore sequencing, etc. MSmodification package is developed by Houyu Zhang during rotation to analyze the MSI data.
+[Magdalena J Koziol Lab](https://dnalaboratory.org/) is studying and aiming to discover further novel DNA and RNA modifications and investigate their role in the brain using mass spectrometry, MS-imaging (MSI) and nanopore sequencing, etc. 
+
+The MSmodification package is developed to analyze the MSI data.
 
 #### Quick start
 
-1. Installation and load the package
+1. **Installation and load the package**
 
 ```R
-#Currently the MSmodification package can only be installed from github:
+#MSmodification package can be installed from github using:
 devtools::install_github("HouyuZhang/MSmodification")
+#Load the installed package
 library(MSmodification)
 ```
 
-2. MSI raw data pre-processing
+2. **MSI raw data pre-processing**
 
-- Calculate the modification intensity based on the reference table, you can find a reference table [here](https://github.com/HouyuZhang/MSmodification/blob/master/CustomeScripts/MSmodification_referenceList.xlsx)
+- Calculate the modification intensity based on the reference table, you can find reference tables [here](https://github.com/HouyuZhang/MSmodification/blob/master/CustomeScripts/MSmodification_referenceList.xlsx).
 
 ```R
 CalculateModificationIntensity(MSFilePath = "Negative_raw/",
@@ -68,16 +71,16 @@ BoxModification(MergeModificationIntensityFile = "Negative-merged-NormalizedPerc
 
 - Slides was subjected to the MSI machine for scanning with a full channel
 
-- MSI results can be visualized by MassImager, brain regions of interest can be segmented to extract the m/z information.
+- MSI results can be visualized by MassImager, brain regions of interest can be segmented to extract the m/z information
 
   ```R
   #There is a builtin function to generate excel with sheet to store MSI segmentation results
-  GenrateExcelforMSdata(BrainRegionNames = c("cerebellum","pons&medulla","midbrain",
+  GenrateExcelforMSdata(SamplesNames = c("loxP1","loxP2","loxP3","KO1","KO2","KO3"),
+                        BrainRegionNames = c("cerebellum","pons&medulla","midbrain",
                                              "hippocampus","thalamus","hypothalamus","fornix",
                                              "caudate putamen","basal forebrain",
                                              "ventral striatum","anterior olfactory",
                                              "olfactory bulbs","cortex","corpus callosum"),
-                        SamplesNames = c("loxP1","loxP2","loxP3","KO1","KO2","KO3"),
                         SectionNames = c("01","02","03"))
   ```
 
