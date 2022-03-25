@@ -4,12 +4,12 @@
 \alias{CalculateModificationIntensity}
 \title{Calculate signal intensity of each modification from MS results}
 \usage{
-CalculateModificationIntensity(MSFilePath = "", ModificationReferenceFile = "")
+CalculateModificationIntensity(MSFilePath, ModificationReferenceFile)
 }
 \arguments{
 \item{MSFilePath}{A directory containing excel xlsx files that records m/z and corresponding signal intensity}
 
-\item{ModificationReferenceFile}{A user defined reference modification list and m/s ranges}
+\item{ModificationReferenceFile}{A user defined reference modification list and m/z ranges}
 }
 \description{
 Calculate signal intensity of each modification from MS results

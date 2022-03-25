@@ -5,7 +5,7 @@
 \title{Draw modified Volcano Plot using ggplot}
 \usage{
 volcano_plotting(
-  PlotFile = "",
+  PlotFile,
   ThresholdFC = 1.5,
   ThresholdSig = 0.05,
   TopUpDownShown = c(10, 10)

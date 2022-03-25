@@ -4,7 +4,7 @@
 \alias{RunMetaboAnalystR}
 \title{Run MetaboAnalystR codes}
 \usage{
-RunMetaboAnalystR(pktablePath = "", rowNormMet = c("SumNorm", "NULL")[2])
+RunMetaboAnalystR(pktablePath, rowNormMet = c("SumNorm", "NULL")[2])
 }
 \arguments{
 \item{pktablePath}{A standard MetaboAnalystR input file}
@@ -17,5 +17,5 @@ Run MetaboAnalystR codes
 \examples{
 
 RunMetaboAnalystR(pktablePath = "refinedDF_5depots_abbrev_adi_peri+adi_ibat.csv",
-                rowNormMet = c("SumNorm","NULL")[1])
+                 rowNormMet = c("SumNorm","NULL")[2])
 }

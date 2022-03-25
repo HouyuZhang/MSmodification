@@ -5,7 +5,7 @@
 \title{Draw costume scatter plot for pair-wise T.test or multi-group anova result}
 \usage{
 T_Anavo_plotting(
-  PlotFile = "",
+  PlotFile,
   SigIndex = c("p_value", "fdr")[1],
   ThresholdSig = 0.005,
   TopShown = 10

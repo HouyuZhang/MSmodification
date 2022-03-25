@@ -4,18 +4,12 @@
 \alias{MergeModificationIntensity}
 \title{Merged csv files returned by the CalculateModificationIntensity() function}
 \usage{
-MergeModificationIntensity(
-  CSVPath = "",
-  PickBrainRegionNames = c(),
-  run_RunMetaboAnalystR = T
-)
+MergeModificationIntensity(CSVPath, run_RunMetaboAnalystR = F)
 }
 \arguments{
 \item{CSVPath}{A directory store calculated files generated}
 
-\item{PickBrainRegionNames}{Specify Brain region names for output}
-
-\item{run_RunMetaboAnalystR}{Whether run MetaboAnalystR analysis in the meanwhile}
+\item{run_RunMetaboAnalystR}{Whether run MetaboAnalystR analysis for the merged dataset}
 }
 \description{
 Merged csv files returned by the CalculateModificationIntensity() function

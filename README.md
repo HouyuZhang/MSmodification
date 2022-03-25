@@ -9,3 +9,4 @@ Copyright (c) 2022 KoziolLab@CIBR. All rights reserved.
 ​		[Magdalena J Koziol Lab](https://dnalaboratory.org/) is studying and aiming to discover further novel DNA and RNA modifications and investigate their role in the brain using mass spectrometry and nanopore sequencing, etc. 
 
 ​		This respiratory stores scripts used for data analysis during rotation.
+

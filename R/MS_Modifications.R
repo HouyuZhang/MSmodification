@@ -1,19 +1,14 @@
 #=========================================================================================
-# This script calculate the intensity of each modification type from Mass-Spectrometry
-# result by given a reference table
-
-# Note 1. Please make sure the Mass-Spectrometry returned file was in xlsx format;
-# Note 2. Please make sure there aren't irrelevant xlsx files exist in current directory;
-# Note 3. You can add desired modification in the "Modification_reference.csv" file.
-
-# Version 1.3 created by Houyu Zhang on 2022/03/18
-# Issue report on Hughiez047@gmail.com
+# This script contain all available functions for MSI data analysis
+# Issue report on zhanghouyu@cibr.ac.cn
 # Copyright (c) 2022 __KoziolLab@CIBR__. All rights reserved.
 #=========================================================================================
 
+
 # Loaded installed packages or installed from CRAN and load.
 # setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-packages <- c("tidyverse", "readxl", "tools","MetaboAnalystR","pls","janitor","ggrepel","openxlsx")
+packages <- c("tidyverse", "readxl", "tools","MetaboAnalystR",
+              "pls","janitor","ggrepel","openxlsx","ggpubr")
 
 package.check <- lapply(
   packages,
@@ -25,7 +20,9 @@ package.check <- lapply(
   }
 )
 
-
+#=========================================================================================
+# Part 1. Functions used for pre-processing MSI rawdata
+#=========================================================================================
 
 ##' Generate excel tables for store MS-imaging data for each region, each section and each slide
 ##' @param BrainRegionNames Brain region names selected in the MS-imaging
@@ -39,9 +36,9 @@ package.check <- lapply(
 ##'                      SamplesNames = c("WT4","WT5","WT6","5-FAD4","5-FAD5","5-FAD6"),
 ##'                      SectionNames = c("01","02","03","04"))
 
-GenrateExcelforMSdata <- function(BrainRegionNames = c(),
-                                  SamplesNames = c(),
-                                  SectionNames = c()){
+GenrateExcelforMSdata <- function(BrainRegionNames,
+                                  SamplesNames,
+                                  SectionNames){
   for (SamplesName in SamplesNames){
     for (SectionName in SectionNames){
       wb <- createWorkbook(creator = "AUTO")
@@ -53,6 +50,224 @@ GenrateExcelforMSdata <- function(BrainRegionNames = c(),
     }
   }
 }
+
+##' Calculate signal intensity of each modification from MS results
+##'
+##' @param MSFilePath A directory containing excel xlsx files that records m/z and corresponding signal intensity
+##' @param ModificationReferenceFile A user defined reference modification list and m/z ranges
+##' @examples
+##'
+##' CalculateModificationIntensity(MSFile = "2022-01-10 Negative-WT1-14 brain regions-03.xlsx",
+##'                                ModificationReferenceFile = "Modification_reference.csv")
+
+CalculateModificationIntensity <- function(MSFilePath,
+                                           ModificationReferenceFile){
+
+  MSFiles <- list.files(MSFilePath, pattern = ".xlsx")
+  if (length(MSFiles) < 1){
+    stop("No excel files found in current directory, please check!!!")
+  } else {
+    cat(length(MSFiles),"excel file(s) found in current directory, will calculate one-by-one...\n")
+  }
+
+  #Run each excel file
+  for (MSFile in MSFiles){
+    cat("--->>> Processing Excel: [",MSFile,"] ...\n")
+    ModificationReference <- read_csv(ModificationReferenceFile, show_col_types = F) %>% as.data.frame()
+    MinMR <- min(ModificationReference$mz_lower)
+    MaxMR <- max(ModificationReference$mz_upper)
+    SheetNames <- excel_sheets(MSFile)
+
+    #Define result matrix format
+    ResMat <- matrix(0, nrow = length(unique(ModificationReference$rNs)), ncol = length(SheetNames)) %>% as.data.frame()
+    rownames(ResMat) <- unique(ModificationReference$rNs)
+    colnames(ResMat) <- SheetNames
+
+    #Process each sheet to get intensity of each modification
+    for (SheetName in SheetNames){
+      cat("    -> Processing Sheet (",SheetName,") ...\n")
+      MSraw <- read_xlsx(MSFile, sheet = SheetName)
+      MSraw <- MSraw %>% filter(`m/z` > MinMR & `m/z` < MaxMR)
+      MSraw$Base <- ""
+
+      #Process each m/z compound
+      if (length(MSraw$`m/z`) > 0){
+        for (i in 1:length(MSraw$`m/z`)){
+          mz <- MSraw[i,][[1]]
+          index <- which(ModificationReference$mz_lower <= mz & ModificationReference$mz_upper >= mz)
+          Nucleotide <- ifelse(isTRUE(index > 0), ModificationReference[index,]$rNs, "")
+          MSraw[i,]$Base <- Nucleotide
+        }
+      }
+      #Collapse results
+      ResTable <- MSraw %>% group_by(Base) %>%
+        summarise(Intensity = sum(Intensity)) %>%
+        filter(Base != "")
+
+      matchedIndex <- match(ResTable$Base,rownames(ResMat))
+      ResMat[matchedIndex,SheetName] <- ResTable$Intensity
+    }
+
+    resFileName <- paste0(file_path_sans_ext(MSFile),"_refined.csv")
+    cat("--->>> Done Excel: [",MSFile,"] ...\n")
+    cat("--->>> Writing refined results to [",resFileName,"] ...\n\n\n")
+    write.csv(ResMat, file = resFileName, row.names = T)
+  }
+}
+
+##' Merged csv files returned by the CalculateModificationIntensity() function
+##'
+##' @param CSVPath A directory store calculated files generated
+##' @param run_RunMetaboAnalystR Whether run MetaboAnalystR analysis for the merged dataset
+##' @examples
+##'
+##' MergeModificationIntensity(CSVPath = "./Negative",
+##'                            PickBrainRegionNames = c("hippocampus","cerebellum"))
+
+
+MergeModificationIntensity <- function(CSVPath,
+                                       run_RunMetaboAnalystR = F){
+  Prefix <- file_path_sans_ext(CSVPath)
+  mergedMS <- list.files(path = CSVPath, pattern = ".csv", full.names = T) %>%
+    lapply(read_csv) %>%
+    bind_cols %>% as.data.frame()
+
+  rownames(mergedMS) <- mergedMS$...1
+  mergedMS <- mergedMS %>% select(!starts_with(".."))
+  mergedMS <- mergedMS[,order(colnames(mergedMS),decreasing=TRUE)]
+
+  labels <- gsub("-[0-9]+","",colnames(mergedMS))
+  mergedMS <- rbind(labels, mergedMS)
+  write.csv(file = paste0(Prefix,"-merged.csv"), mergedMS, row.names = T)
+  if(run_RunMetaboAnalystR){
+    RunMetaboAnalystR(pktablePath = paste0(Prefix,"-merged.csv"), rowNormMet = "NULL")
+  }
+}
+
+#=========================================================================================
+# Part 2. Functions used for normalizing MSI data
+#=========================================================================================
+
+##' Normalize signal in each region by dividing total signals in all region in the same section
+##'
+##' @param MergeModificationIntensityFile The merged modification intensity file generated by MergeModificationIntensity()
+##' @param SampleIndex Specify Sample index for group samples
+##' @param SectionIndex Specify Section index for group sections
+##' @examples
+##'
+##' NormalizationIntensity(MergeModificationIntensityFile = "",
+##'                        SampleIndex = c("FAD1","FAD2","FAD3","WT1","WT2","WT3"),
+##'                        SectionIndex = c("-01","-02","-03","-04"))
+
+NormalizationIntensitySections <- function(MergeModificationIntensityFile,
+                                           SampleIndex,
+                                           SectionIndex){
+  Prefix <- file_path_sans_ext(MergeModificationIntensityFile)
+  headers <- read.csv(MergeModificationIntensityFile, header = F, nrows = 1, as.is = T)[-1]
+  mergedMS <- read.csv(MergeModificationIntensityFile, header = F, row.names = 1, check.names = F, skip = 2)
+  colnames(mergedMS) <- headers
+
+  mergedMSNormaed <- data.frame(matrix(ncol=0, nrow=length(rownames(mergedMS)), dimnames=list(rownames(mergedMS),NULL)))
+  #Do normalization for each section of each sample
+  for (i in SectionIndex){
+    for (j in SampleIndex){
+      mergedMS1 <- mergedMS %>% select(contains(i, ignore.case = TRUE)) %>% select(contains(j, ignore.case = TRUE))
+      mergedMS1 <- t(apply(mergedMS1,1, function(x) x/sum(x)))
+      mergedMSNormaed <- cbind(mergedMSNormaed, mergedMS1)
+    }
+  }
+  labels <- gsub("-[0-9]+","",colnames(mergedMSNormaed))
+  mergedMSNormaed <- rbind(labels, mergedMSNormaed)
+  write.csv(file = paste0(Prefix,"-NormalizedSections.csv"), mergedMSNormaed, row.names = T)
+}
+
+##' Normalize signal in each region by dividing total signals in all region and all sections in the same slide
+##'
+##' @param MergeModificationIntensityFile The merged modification intensity file generated by MergeModificationIntensity()
+##' @param SectionIndex Specify Section index for group sections
+##' @examples
+##'
+##' NormalizationIntensity(MergeModificationIntensityFile = "",
+##'                        SectionIndex = c("-01","-02","-03","-04"))
+
+NormalizationIntensitySlides <- function(MergeModificationIntensityFile,
+                                         SectionIndex){
+  Prefix <- file_path_sans_ext(MergeModificationIntensityFile)
+  headers <- read.csv(MergeModificationIntensityFile, header = F, nrows = 1, as.is = T)[-1]
+  mergedMS <- read.csv(MergeModificationIntensityFile, header = F, row.names = 1, check.names = F, skip = 2)
+  colnames(mergedMS) <- headers
+
+  mergedMSNormaed <- data.frame(matrix(ncol=0, nrow=length(rownames(mergedMS)), dimnames=list(rownames(mergedMS),NULL)))
+  #Do normalization for each section of each sample
+  for (i in SectionIndex){
+    mergedMS1 <- mergedMS %>% select(contains(i, ignore.case = TRUE))
+    mergedMS1 <- t(apply(mergedMS1,1, function(x) x/sum(x)))
+    mergedMSNormaed <- cbind(mergedMSNormaed, mergedMS1)
+  }
+  labels <- gsub("-[0-9]+","",colnames(mergedMSNormaed))
+  mergedMSNormaed <- rbind(labels, mergedMSNormaed)
+  write.csv(file = paste0(Prefix,"-NormalizedSlides.csv"), mergedMSNormaed, row.names = T)
+}
+
+##' Normalize each modification to the total amount of its corresponding nucleotide base
+##'
+##' @param MergeModificationIntensityFile The merged modification intensity file generated by MergeModificationIntensity()
+##' @param ModificationReferenceFile A user defined reference modification list and m/s ranges
+##' @examples
+##'
+##' NormalizationIntensityPercentage(MergeModificationIntensityFile = "2022-03-04 mettl3-KO-loxP/1_Negative-merged.csv",
+##'                                  ModificationReferenceFile = "2022-03-04 mettl3-KO-loxP/Re.csv")
+
+NormalizationIntensityPercentage <- function(MergeModificationIntensityFile,
+                                             ModificationReferenceFile){
+
+  ModificationReference <- read_csv(ModificationReferenceFile, show_col_types = F) %>% as.data.frame()
+
+  Prefix <- file_path_sans_ext(MergeModificationIntensityFile)
+  headers <- read.csv(MergeModificationIntensityFile, header = F, nrows = 1, as.is = T)[-1]
+  mergedMS <- read.csv(MergeModificationIntensityFile, header = F, row.names = 1, check.names = F, skip = 2)
+  colnames(mergedMS) <- headers
+
+  modificationTypes <- unique(ModificationReference$rNs)
+  for (modificationType in modificationTypes){
+    BaseGroup <- ModificationReference %>% filter(rNs == modificationType) %>% select(Base_type) %>% unique() %>% as.character()
+    BaseGroupTypes <- ModificationReference %>% filter(Base_type == BaseGroup) %>% select(rNs) %>% unique()
+    mergedMS[modificationType,] <- mergedMS[modificationType,]/colSums(mergedMS[BaseGroupTypes$rNs,])
+  }
+
+  labels <- gsub("-[0-9]+","",colnames(mergedMS))
+  mergedMS <- rbind(labels, mergedMS)
+  write.csv(file = paste0(Prefix,"-NormalizedSIndividual.csv"), mergedMS, row.names = T)
+}
+
+##' Merge technical replicates based on section suffix
+##'
+##' @param MergeModificationIntensityFile The merged modification intensity file generated by MergeModificationIntensity()
+##' @examples
+##'
+##' MergeTechnicalReplicates(MergeModificationIntensityFile = "Positive-merged.csv")
+
+MergeTechnicalReplicates <- function(MergeModificationIntensityFile){
+
+  #Merge technical replicates
+  Prefix <- file_path_sans_ext(MergeModificationIntensityFile)
+  headers <- read.csv(MergeModificationIntensityFile, header = F, nrows = 1, as.is = T)[-1]
+  mergedMS <- read.csv(MergeModificationIntensityFile, header = F, row.names = 1, check.names = F, skip = 2)
+  colnames(mergedMS) <- headers
+
+  mergedMS <- t(apply(mergedMS,1, function(x) tapply(x,colnames(mergedMS),mean)))
+  labels <- gsub("[1-3]-","-",colnames(mergedMS))
+  mergedMS <- rbind(labels, mergedMS)
+  write.csv(file = paste0(Prefix,"-mergeTR.csv"), mergedMS, row.names = T)
+
+  #Remove certain sections
+  # mergedMSPicked <- mergedMS %>% select(!contains("-01", ignore.case = TRUE))
+  # write.csv(file = paste0(Prefix,"-merged_r01.csv"), mergedMSPicked, row.names = T)
+}
+
+#=========================================================================================
+# Part 3. Functions used for analyzing MSI data
+#=========================================================================================
 
 ##' Draw modified Volcano Plot using ggplot
 ##' @param PlotFile The file returned by Volcano.Anal() in MetaboAnalystR
@@ -66,7 +281,7 @@ GenrateExcelforMSdata <- function(BrainRegionNames = c(),
 ##'                  ThresholdSig = 0.05,
 ##'                  TopUpDownShown = c(10,10))
 
-volcano_plotting <- function(PlotFile = "",
+volcano_plotting <- function(PlotFile,
                              ThresholdFC = 1.5,
                              ThresholdSig = 0.05,
                              TopUpDownShown = c(10,10)){
@@ -131,7 +346,7 @@ volcano_plotting <- function(PlotFile = "",
 ##'                  SigIndex = c("p_value","fdr")[1],
 ##'                  ThresholdSig = 0.005,TopShown = 10)
 
-T_Anavo_plotting <- function(PlotFile = "",
+T_Anavo_plotting <- function(PlotFile,
                              SigIndex = c("p_value","fdr")[1],
                              ThresholdSig = 0.005,
                              TopShown = 10){
@@ -187,9 +402,9 @@ T_Anavo_plotting <- function(PlotFile = "",
 ##' @examples
 ##'
 ##' RunMetaboAnalystR(pktablePath = "refinedDF_5depots_abbrev_adi_peri+adi_ibat.csv",
-##'                 rowNormMet = c("SumNorm","NULL")[1])
+##'                  rowNormMet = c("SumNorm","NULL")[2])
 
-RunMetaboAnalystR <- function(pktablePath = "",
+RunMetaboAnalystR <- function(pktablePath,
                               rowNormMet = c("SumNorm","NULL")[2]){
 
   prefix <- file_path_sans_ext(pktablePath)
@@ -279,197 +494,96 @@ RunMetaboAnalystR <- function(pktablePath = "",
   }
 }
 
-##' Calculate signal intensity of each modification from MS results
-##'
-##' @param MSFilePath A directory containing excel xlsx files that records m/z and corresponding signal intensity
-##' @param ModificationReferenceFile A user defined reference modification list and m/s ranges
-##' @examples
-##'
-##' CalculateModificationIntensity(MSFile = "2022-01-10 Negative-WT1-14 brain regions-03.xlsx",
-##'                                ModificationReferenceFile = "Modification_reference.csv")
-
-CalculateModificationIntensity <- function(MSFilePath = "",
-                                           ModificationReferenceFile = ""){
-
-  MSFiles <- list.files(MSFilePath, pattern = ".xlsx")
-  if (length(MSFiles) < 1){
-    stop("No excel files found in current directory, please check!!!")
-  } else {
-    cat(length(MSFiles),"excel file(s) found in current directory, will calculate one-by-one...\n")
-  }
-
-  #Run each excel file
-  for (MSFile in MSFiles){
-    cat("--->>> Processing Excel: [",MSFile,"] ...\n")
-    ModificationReference <- read_csv(ModificationReferenceFile, show_col_types = F) %>% as.data.frame()
-    MinMR <- min(ModificationReference$mz_lower)
-    MaxMR <- max(ModificationReference$mz_upper)
-    SheetNames <- excel_sheets(MSFile)
-
-    #Define result matrix format
-    ResMat <- matrix(0, nrow = length(unique(ModificationReference$rNs)), ncol = length(SheetNames)) %>% as.data.frame()
-    rownames(ResMat) <- unique(ModificationReference$rNs)
-    colnames(ResMat) <- SheetNames
-
-    #Process each sheet to get intensity of each modification
-    for (SheetName in SheetNames){
-      cat("    -> Processing Sheet (",SheetName,") ...\n")
-      MSraw <- read_xlsx(MSFile, sheet = SheetName)
-      MSraw <- MSraw %>% filter(`m/z` > MinMR & `m/z` < MaxMR)
-      MSraw$Base <- ""
-
-      #Process each m/z compound
-      if (length(MSraw$`m/z`) > 0){
-        for (i in 1:length(MSraw$`m/z`)){
-          mz <- MSraw[i,][[1]]
-          index <- which(ModificationReference$mz_lower <= mz & ModificationReference$mz_upper >= mz)
-          Nucleotide <- ifelse(isTRUE(index > 0), ModificationReference[index,]$rNs, "")
-          MSraw[i,]$Base <- Nucleotide
-        }
-      }
-      #Collapse results
-      ResTable <- MSraw %>% group_by(Base) %>%
-        summarise(Intensity = sum(Intensity)) %>%
-        filter(Base != "")
-
-      matchedIndex <- match(ResTable$Base,rownames(ResMat))
-      ResMat[matchedIndex,SheetName] <- ResTable$Intensity
-    }
-
-    resFileName <- paste0(file_path_sans_ext(MSFile),"_refined.csv")
-    cat("--->>> Done Excel: [",MSFile,"] ...\n")
-    cat("--->>> Writing refined results to [",resFileName,"] ...\n\n\n")
-    write.csv(ResMat, file = resFileName, row.names = T)
-  }
-}
-
-##' Merged csv files returned by the CalculateModificationIntensity() function
-##'
-##' @param CSVPath A directory store calculated files generated
-##' @param PickBrainRegionNames Specify Brain region names for output
-##' @param run_RunMetaboAnalystR Whether run MetaboAnalystR analysis in the meanwhile
-##' @examples
-##'
-##' MergeModificationIntensity(CSVPath = "./Negative",
-##'                            PickBrainRegionNames = c("hippocampus","cerebellum"))
-
-
-MergeModificationIntensity <- function(CSVPath = "",
-                                       PickBrainRegionNames = c(),
-                                       run_RunMetaboAnalystR = T){
-  Prefix <- file_path_sans_ext(CSVPath)
-  mergedMS <- list.files(path = CSVPath, pattern = ".csv", full.names = T) %>%
-    lapply(read_csv) %>%
-    bind_cols %>% as.data.frame()
-
-  rownames(mergedMS) <- mergedMS$...1
-  mergedMS <- mergedMS %>% select(!starts_with(".."))
-  mergedMS <- mergedMS[,order(colnames(mergedMS),decreasing=TRUE)]
-
-  labels <- gsub("-[0-9]+","",colnames(mergedMS))
-  mergedMS <- rbind(labels, mergedMS)
-  write.csv(file = paste0(Prefix,"-merged.csv"), mergedMS, row.names = T)
-  if(run_RunMetaboAnalystR){
-    RunMetaboAnalystR(pktablePath = paste0(Prefix,"-merged.csv"), rowNormMet = "NULL")
-    }
-
-  if (!is.null(PickBrainRegionNames)){
-    mergedMSPicked <- mergedMS %>% select(contains(PickBrainRegionNames, ignore.case = TRUE))
-    write.csv(file = paste0(Prefix,paste(PickBrainRegionNames, collapse ="-"),".csv"), mergedMSPicked, row.names = T)
-    if(run_RunMetaboAnalystR){
-      RunMetaboAnalystR(pktablePath = paste0(Prefix,paste(PickBrainRegionNames, collapse ="-"),".csv"),
-                        rowNormMet = "NULL")
-      }
-  }
-}
-
-##' Normalize signal in each region by dividing total signals in all region in the same section
-##'
-##' @param IntFileName A directory stores calculated files generated by MergeModificationIntensity()
-##' @param SampleIndex Specify Sample index for group samples
-##' @param SectionIndex Specify Section index for group sections
-##' @examples
-##'
-##' NormalizationIntensity(IntFileName = "",
-##'                        SampleIndex = c("FAD1","FAD2","FAD3","WT1","WT2","WT3"),
-##'                        SectionIndex = c("-01","-02","-03","-04"))
-
-NormalizationIntensity <- function(IntFileName = "",
-                                   SampleIndex = c("FAD1","FAD2","FAD3","WT1","WT2","WT3"),
-                                   SectionIndex = c("-01","-02","-03","-04")){
-  Prefix <- file_path_sans_ext(IntFileName)
-  mergedMS <- read.csv(IntFileName, header = T, row.names = 1, check.names = F)
-  mergedMSNormaed <- data.frame(matrix(ncol=0,nrow=length(rownames(mergedMS)), dimnames=list(rownames(mergedMS),NULL)))
-  #Do normalization for each section of each sample
-  for (i in SectionIndex){
-    for (j in SampleIndex){
-      mergedMS1 <- mergedMS %>% select(contains(i, ignore.case = TRUE)) %>% select(contains(j, ignore.case = TRUE))
-      mergedMS1 <- t(apply(mergedMS1,1, function(x) x/sum(x)))
-      mergedMSNormaed <- cbind(mergedMSNormaed, mergedMS1)
-    }
-  }
-  labels <- gsub("-[0-9]+","",colnames(mergedMSNormaed))
-  mergedMSNormaed <- rbind(labels, mergedMSNormaed)
-  write.csv(file = paste0(Prefix,"-Normalized.csv"), mergedMSNormaed, row.names = T)
-}
-
-##' This is a standalone script for picking certain regions and features
+##' This is the core script for picking certain regions and features for analyses
 ##'
 ##' @param MergeModificationIntensityName A directory stores calculated files generated by MergeModificationIntensity()
 ##' @param PickBrainRegionNames Specify Brain region name(s) for output
 ##' @param run_RunMetaboAnalystR Whether run MetaboAnalystR analysis in the meanwhile
+##' @param FeatureList provide modification types used in the analysis
 ##' @examples
 ##'
-##' PickBrainRegion(MergeModificationIntensityName = "Positive-merged.csv",
+##' PickBrainRegion(MergeModificationIntensityFile = "Positive-merged.csv",
 ##'                 PickBrainRegionNames = "cerebellum",
 ##'                 run_RunMetaboAnalystR = T,
 ##'                 FeatureList = c("m6Am","ac4C","m22G","hm5CTP","m6dA","m5dC",
 ##'                                 "ca5dC","m5dCTP","m6dATP","f5dCTP","m5CMP","m6AMP"))
 
-PickBrainRegion <- function(MergeModificationIntensityName = "Positive-merged.csv",
-                            PickBrainRegionNames = c("cerebellum"),
+PickBrainRegion <- function(MergeModificationIntensityFile,
+                            PickBrainRegionNames,
                             run_RunMetaboAnalystR = T,
-                            FeatureList = c()){
+                            FeatureList){
 
-  Prefix <- file_path_sans_ext(MergeModificationIntensityName)
-  mergedMS <- read_csv(MergeModificationIntensityName) %>% as.data.frame()
+  Prefix <- file_path_sans_ext(MergeModificationIntensityFile)
+  mergedMS <- read_csv(MergeModificationIntensityFile) %>% as.data.frame()
   rownames(mergedMS) <- mergedMS$...1
   mergedMS <- mergedMS[,-1]
+  # table(gsub("-[0-9]+|[0-9]+-","",colnames(mergedMS))) %>% as.data.frame()
 
   mergedMSPicked <- mergedMS %>% select(contains(PickBrainRegionNames, ignore.case = TRUE))
 
   #Defined features for analysis
   if(!is.null(FeatureList)){
     if(!all(FeatureList %in% rownames(mergedMSPicked))){stop("Some features are not in the reference table, please check!!!")}
-    FeatureList <- c("1",FeatureList)
+    FeatureList <- c(rownames(mergedMSPicked)[1],FeatureList)
     mergedMSPicked <- mergedMSPicked[rownames(mergedMSPicked) %in% FeatureList,]
   }
   write.csv(file = paste0(Prefix,paste(PickBrainRegionNames, collapse ="-"),".csv"), mergedMSPicked, row.names = T)
+
   if(run_RunMetaboAnalystR){
-    RunMetaboAnalystR(pktablePath = paste0(Prefix,paste(PickBrainRegionNames, collapse ="-"),".csv"),
-                      rowNormMet = "NULL")
+    RunMetaboAnalystR(pktablePath = paste0(Prefix,paste(PickBrainRegionNames, collapse ="-"),".csv"), rowNormMet = "NULL")
   }
 }
 
-##' Merge technical replicates based on section suffix
+##' Plot boxplot for each modification within each brain region
 ##'
-##' @param PlainModificationIntensityName A modified version of MergeModificationIntensityName
+##' @param MergeModificationIntensityName A directory stores calculated files generated by MergeModificationIntensity()
+##' @param SampleIndex provide the sample prefix to set brain region names
 ##' @examples
 ##'
-##' MergeTR(PlainModificationIntensityName = "Positive-merged.csv")
+##' BoxModification(MergeModificationIntensityFile = "2022-03-04 mettl3-KO-loxP/1_Negative-merged-NormalizedSIndividual.csv",
+##'                 SampleIndex = c("Neg-mettl3-loxP1-","Neg-mettl3-loxP2-","Neg-mettl3-loxP3-",
+##'                                 "Neg-mettl3-KO1-","Neg-mettl3-KO2-","Neg-mettl3-KO3-"))
 
-MergeTR <- function(PlainModificationIntensityName = ""){
+BoxModification <- function(MergeModificationIntensityFile,
+                            SampleIndex){
 
-  #Merge technical replicates
-  Prefix <- file_path_sans_ext(PlainModificationIntensityName)
-  mergedMS <- read.csv(PlainModificationIntensityName, header = T, row.names = 1, check.names = F)
-  mergedMS <- t(apply(mergedMS,1, function(x) tapply(x,colnames(mergedMS),mean)))
-  labels <- gsub("[1-3]-","-",colnames(mergedMS))
-  mergedMS <- rbind(labels, mergedMS)
-  write.csv(file = paste0(Prefix,"-mergeTR.csv"), mergedMS, row.names = T)
+  Prefix <- file_path_sans_ext(MergeModificationIntensityFile)
+  headers <- read.csv(MergeModificationIntensityFile, header = F, nrows = 1, as.is = T)[-1]
+  mergedMS <- read.csv(MergeModificationIntensityFile, header = F, row.names = 1, check.names = F, skip = 2)
+  colnames(mergedMS) <- headers
 
-  #Remove certain sections
-  # mergedMSPicked <- mergedMS %>% select(!contains("-01", ignore.case = TRUE))
-  # write.csv(file = paste0(Prefix,"-merged_r01.csv"), mergedMSPicked, row.names = T)
+  mergedMS <- mergedMS %>% t() %>% as.data.frame()
+  mergedMS$SampleName <- rownames(mergedMS)
+  mergedMS$BrainRegion <- gsub("-[0-9]+","",mergedMS$SampleName)
+  mergedMS$BrainRegion <- gsub(paste0(SampleIndex,collapse = "|"),"",mergedMS$BrainRegion)
+
+  pattern <- gsub("\\[",".*|[",paste0(unique(mergedMS$BrainRegion),collapse = "[0-9]+-"))
+  pattern <- paste0("[0-9]+-",pattern,".*")
+
+  mergedMS$Group <- gsub(pattern,"",mergedMS$SampleName)
+  mergedMS <- mergedMS %>% clean_names()
+
+  pdf(paste0(Prefix,"_BoxPlot.pdf"), width = 20, height = 4)
+  for (i in colnames(mergedMS)[1:c(length(colnames(mergedMS))-3)]){
+    Groups <- "group"
+    p <- ggplot(mergedMS, aes_string(x = Groups, y = i)) +
+      geom_boxplot(aes(fill = group), notch=F, size=0.8) +
+      geom_point(size=2, alpha = 0.5) +
+      stat_compare_means(method = "t.test", paired = F, comparisons = list(unique(mergedMS$group))) +
+      facet_wrap(~brain_region, ncol=14) +
+      scale_fill_manual(values = c("#66A61E","#D95F02")) +
+      labs(x = "", title = toupper(i)) +
+      theme_bw() +
+      theme(
+        axis.text.x = element_blank(),
+        axis.text.y = element_text(color="black", size=11, face="bold"),
+        legend.title = element_text(color="black", size=14, face="bold"),
+        legend.text = element_text(color="black", size=12, face="bold"),
+        strip.text.x = element_text(size = 10, face="bold")
+      )
+    plot(p)
+
+  }
+  dev.off()
 }
 
