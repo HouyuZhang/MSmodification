@@ -4,12 +4,12 @@
 \alias{GenrateExcelforMSdata}
 \title{Generate excel tables for store MS-imaging data for each region, each section and each slide}
 \usage{
-GenrateExcelforMSdata(BrainRegionNames, SamplesNames, SectionNames)
+GenrateExcelforMSdata(SamplesNames, BrainRegionNames, SectionNames)
 }
 \arguments{
-\item{BrainRegionNames}{Brain region names selected in the MS-imaging}
-
 \item{SamplesNames}{Sample names for each section}
+
+\item{BrainRegionNames}{Brain region names selected in the MS-imaging}
 
 \item{SectionNames}{Number for each section}
 }
@@ -18,9 +18,9 @@ Generate excel tables for store MS-imaging data for each region, each section an
 }
 \examples{
 
-GenrateExcelforMSdata(BrainRegionNames = c("cerebellum","pons&medulla","midbrain","hippocampus","thalamus",
+GenrateExcelforMSdata(SamplesNames = c("WT4","WT5","WT6","5-FAD4","5-FAD5","5-FAD6"),
+                     BrainRegionNames = c("cerebellum","pons&medulla","midbrain","hippocampus","thalamus",
                                            "hypothalamus","fornix","caudate putamen","basal forebrain","ventral striatum",
                                            "anterior olfactory","olfactory bulbs","cortex","corpus callosum"),
-                     SamplesNames = c("WT4","WT5","WT6","5-FAD4","5-FAD5","5-FAD6"),
                      SectionNames = c("01","02","03","04"))
 }

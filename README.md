@@ -10,7 +10,7 @@ Copyright (c) 2022 KoziolLab@CIBR. All rights reserved.
 
 The MSmodification package is developed to analyze the MSI data.
 
-#### Quick start
+### Quick start
 
 1. **Installation and load the package**
 
@@ -65,7 +65,7 @@ BoxModification(MergeModificationIntensityFile = "Negative-merged-NormalizedPerc
                                 "mettl3-KO1-","mettl3-KO2-","mettl3-KO3-"))
 ```
 
-#### How to generate the MSI rawdata?
+### How to generate the MSI rawdata?
 
 - The whole mouse brain is dissected and frozen at -80 degree, then brain was sliced into 20μm `sections` covering the `sides`
 
