@@ -1,3 +1,13 @@
 exportPattern("^[[:alpha:]]+")
-export("volcano_plotting", "T_Anavo_plotting","RunMetaboAnalystR",
-       "CalculateModificationIntensity","MergeModificationIntensity","PickBrainRegion")
+export("GenrateExcelforMSdata",
+       "CalculateModificationIntensity",
+       "MergeModificationIntensity",
+       "NormalizationIntensitySections",
+       "NormalizationIntensitySlides",
+       "NormalizationIntensityPercentage",
+       "MergeTechnicalReplicates",
+       "volcano_plotting",
+       "T_Anavo_plotting",
+       "RunMetaboAnalystR",
+       "PickBrainRegion"
+       "BoxModification")
