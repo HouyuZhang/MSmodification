@@ -21,7 +21,7 @@ devtools::install_github("HouyuZhang/MSmodification")
 library(MSmodification)
 ```
 
-2. **MSI raw data pre-processing**
+2. **MSI raw data preprocessing**
 
 - Calculate the modification intensity based on the reference table, you can find reference tables [here](https://github.com/HouyuZhang/MSmodification/blob/master/CustomeScripts/MSmodification_referenceList.xlsx).
 
@@ -37,7 +37,7 @@ MergeModificationIntensity(CSVPath = "1_Negative refined",
                            run_RunMetaboAnalystR = F)
 ```
 
-- Normalize the intensity using three methods, but the section-based method is not recommended:
+- Normalize the intensity using three methods. 
 
 ```R
 #Normalization across each slide
@@ -47,12 +47,20 @@ NormalizationIntensitySlides(MergeModificationIntensityFile = "1_Negative refine
 NormalizationIntensityPercentage(MergeModificationIntensityFile = "1_Negative refined-merged.csv",
                                  ModificationReferenceFile = "./Modification_reference_Neg.csv")
 #Normalization across each section
-#NormalizationIntensitySections(MergeModificationIntensityFile = "1_Negative refined-merged.csv",
-#                               SampleIndex = c("loxP1","loxP2","loxP3","KO1","KO2","KO3"),
-#                               SectionIndex = c("-01","-02","-03","-04","-05","-06"))
+NormalizationIntensitySections(MergeModificationIntensityFile = "1_Negative refined-merged.csv",
+                               SampleIndex = c("loxP1","loxP2","loxP3","KO1","KO2","KO3"),
+                               SectionIndex = c("-01","-02","-03","-04","-05","-06"))
 ```
 
-3. Analyze modification dynamics based on selected brain regions and modification types
+- ​	This package provide four types of data, there are some suggestions on selecting data types for downstream applications: 
+
+  - `Rawdata`: The rawdata is highly meaningful and straightforward because it is calculated by referring to standards, however you need to carefully compare the values across different slides.
+
+  - `Sections-based`: Not recommended, unless you only compare the results within the same section.
+  - `Slide-based`: Recommended when comparing data across slides and mapping the intensity to MS images. The relative values in the MS images (blue and red color in MassImager) is equivalent to the slide-based normalized values.
+  - `Percentage-based`: Recommend when you want to check whether the modification ratio is different, because higher total nucleoside concentration can results higher modified nucleoside without mechanical changes.
+
+- Analyze modification dynamics based on selected brain regions and modification types
 
 ```R
 PickBrainRegion(MergeModificationIntensityFile = "1_Negative refined-merged-NormalizedPercentage.csv",
@@ -78,9 +86,9 @@ BoxModification(MergeModificationIntensityFile = "1_Negative refined-merged-Norm
 
 - MSI results can be visualized by MassImager, brain regions of interest can be segmented to extract the m/z information
 
+- Using the built-in function to generate excel with sheet to store MSI segmentation results. I will always suggest using this function since misspells affect downstream analyses
+
   ```R
-  # There is a builtin function to generate excel with sheet to store MSI segmentation results
-  # I suggest using this function to generate excel sheets, since misspells affect dowstream analyses
   GenrateExcelforMSdata(SamplesNames = c("loxP1","loxP2","loxP3","KO1","KO2","KO3"),
                         BrainRegionNames = c("cerebellum","pons&medulla","midbrain",
                                              "hippocampus","thalamus","hypothalamus","fornix",
