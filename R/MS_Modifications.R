@@ -225,17 +225,18 @@ NormalizationIntensityPercentage <- function(MergeModificationIntensityFile,
   headers <- read.csv(MergeModificationIntensityFile, header = F, nrows = 1, as.is = T)[-1]
   mergedMS <- read.csv(MergeModificationIntensityFile, header = F, row.names = 1, check.names = F, skip = 2)
   colnames(mergedMS) <- headers
-
+  mergedMS_Res <- mergedMS
   modificationTypes <- unique(ModificationReference$rNs)
   for (modificationType in modificationTypes){
-    BaseGroup <- ModificationReference %>% filter(rNs == modificationType) %>% select(Base_type) %>% unique() %>% as.character()
+    BaseGroup <- ModificationReference %>% filter(rNs == modificationType) %>%
+      select(Base_type) %>% unique() %>% as.character()
     BaseGroupTypes <- ModificationReference %>% filter(Base_type == BaseGroup) %>% select(rNs) %>% unique()
-    mergedMS[modificationType,] <- mergedMS[modificationType,]/colSums(mergedMS[BaseGroupTypes$rNs,])
+    mergedMS_Res[modificationType,] <- mergedMS[modificationType,]/colSums(mergedMS[BaseGroupTypes$rNs,])
   }
 
-  labels <- gsub("-[0-9]+","",colnames(mergedMS))
-  mergedMS <- rbind(labels, mergedMS)
-  write.csv(file = paste0(Prefix,"-NormalizedPercentage.csv"), mergedMS, row.names = T)
+  labels <- gsub("-[0-9]+","",colnames(mergedMS_Res))
+  mergedMS_Res <- rbind(labels, mergedMS_Res)
+  write.csv(file = paste0(Prefix,"-NormalizedPercentage.csv"), mergedMS_Res, row.names = T)
 }
 
 ##' Merge technical replicates based on section suffix
